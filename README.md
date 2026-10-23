@@ -29,9 +29,11 @@ REST API на Python для приёма и обработки заявок ст
 * одна локальная БД SQLite — сервис рассчитан на один экземпляр и нагрузку учебного заведения;
 * пароли хранятся только как стойкий хэш (scrypt с солью), права проверяются на сервере для каждой операции.
 
-## Создание окружения
+## Быстрый старт
 
 Нужен Python **3.11+** (проверено на 3.13 и 3.14).
+
+### 1. Создание окружения (один раз)
 
 **Windows (PowerShell / cmd):**
 ```bat
@@ -45,25 +47,71 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Запуск приложения одной командой (`python -m app`) и тесты (`python -m pytest`) появляются на этапе УП6.
+### 2. Запуск — одна команда
+
+```bash
+.venv\Scripts\python -m app        # Windows
+.venv/bin/python -m app            # Linux / macOS
+```
+
+Команда сама применяет миграции Alembic (`upgrade head`: схема + категории «IT», «Учебный процесс», «Хозяйственная часть») и запускает сервер на http://127.0.0.1:8000.
+Документация API — http://127.0.0.1:8000/docs, схема — http://127.0.0.1:8000/openapi.json.
+
+### 3. Тесты
+
+```bash
+.venv\Scripts\python -m pytest     # Windows
+.venv/bin/python -m pytest         # Linux / macOS
+```
+
+Тесты используют временные SQLite‑базы и не трогают рабочую `college_tickets.db`.
+
+## Конфигурация (переменные окружения)
+
+Настройки читаются только в `app/core/config.py`. Можно задать переменные окружения или создать файл `.env` по образцу `.env.example`.
+
+| Переменная | По умолчанию (dev) | Описание |
+|------------|--------------------|----------|
+| `APP_ENV` | `dev` | `dev`, `test` или `prod` |
+| `DATABASE_URL` | `sqlite:///<проект>/college_tickets.db` | **обязательна в test/prod** |
+| `SECRET_KEY` | учебный ключ (только dev) | ключ подписи JWT, **обязателен в test/prod**, в prod ≥ 32 символов |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | срок действия токена |
+| `HOST`, `PORT` | `127.0.0.1`, `8000` | адрес сервера |
+| `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_PASSWORD` | — | если заданы, при запуске создаётся администратор |
+
+Если в `test`/`prod` не задана обязательная переменная, запуск останавливается с понятным сообщением, например:
+`Не задана обязательная переменная окружения: SECRET_KEY (APP_ENV=test). Задайте её перед запуском, например: SECRET_KEY=... (образец — в файле .env.example).`
+
+### Миграции вручную
+
+```bash
+python -m alembic upgrade head      # создать схему и начальные категории
+python -m alembic downgrade base    # удалить все изменения
+python -m alembic history           # цепочка: 0001_initial -> 0002_seed_categories
+```
 
 ## Структура репозитория
 
 ```
 college-ticket-service/
-├── app/                   # исходный код (пакет Python; наполняется с УП6)
-│   └── __init__.py
-├── tests/                 # автотесты pytest (наполняются с УП6)
-│   └── __init__.py
-├── docs/                  # документация проектирования
-│   ├── 02_user_stories.md
-│   ├── 03_architecture.md
-│   ├── 04_data_model.md
-│   ├── 05_api_contract.md
-│   └── img/               # architecture.png, er_diagram.png (+ исходники .dot)
-├── requirements.txt       # зависимости проекта
-├── .gitignore
-└── README.md
+├── app/
+│   ├── __main__.py        # python -m app: миграции + uvicorn
+│   ├── main.py            # create_app(), обработчик запуска, единый формат ошибок
+│   ├── db_migrate.py      # программный вызов Alembic
+│   ├── core/              # config, database, security (scrypt, JWT), errors
+│   ├── models/            # 5 ORM-моделей + Enum ролей/статусов/действий
+│   ├── repositories/      # 5 репозиториев (без FastAPI и без commit)
+│   ├── services/          # бизнес-логика, commit/rollback
+│   ├── schemas/           # Pydantic: вход/выход, без password_hash в ответах
+│   └── routers/           # /health, /auth/*, /users/me, зависимости auth
+├── migrations/            # Alembic: 0001_initial, 0002_seed_categories
+├── tests/                 # pytest
+├── docs/                  # документация этапа проектирования (УП1–УП5)
+├── alembic.ini
+├── requirements.txt
+├── pytest.ini
+├── .env.example
+└── .gitignore
 ```
 
 ## Документация
@@ -75,15 +123,18 @@ college-ticket-service/
 | [`docs/03_architecture.md`](docs/03_architecture.md) — 7 модулей, диаграмма, правила зависимостей | УП3 |
 | [`docs/04_data_model.md`](docs/04_data_model.md) — ER‑схема и словарь данных | УП4 |
 | [`docs/05_api_contract.md`](docs/05_api_contract.md) — 21 операция, единый формат ошибки, схемы OpenAPI | УП5 |
+| [`docs/06_implementation.md`](docs/06_implementation.md) — как выполнены УП6–УП12 и чем это проверено | УП6–УП12 |
 
-## Этап 1: обязательные результаты
+## Статус реализации
 
-| УП | Обязательный результат | Где |
-|----|------------------------|-----|
-| УП1 | Репозиторий открывается; README содержит название, цель, роли, ограничения и команду создания окружения | этот файл, `.gitignore`, каталоги `docs/`, `app/`, `tests/` |
-| УП2 | 12 историй и ≥ 24 проверяемых критерия Given–When–Then (сделано 31) | `docs/02_user_stories.md` |
-| УП3 | Диаграмма из 7 модулей, без циклических зависимостей, обязанность каждого — одной фразой | `docs/03_architecture.md`, `docs/img/architecture.png` |
-| УП4 | ER‑схема 5 сущностей, словарь всех полей, PK/FK/unique/NULL/каскады, кратность связей | `docs/04_data_model.md`, `docs/img/er_diagram.png` |
-| УП5 | Контракт ≥ 15 операций (сделано 21): метод, путь, роль, код успеха, коды ошибок; схемы OpenAPI и единый формат ошибки | `docs/05_api_contract.md` |
-
-Следующий этап (УП6–УП12): каркас FastAPI, модели, миграции, репозитории, схемы, регистрация и вход.
+| Этап | Содержание | Статус |
+|------|------------|--------|
+| УП1–УП5 | постановка, истории, архитектура, модель данных, контракт API | ✅ |
+| УП6 | каркас, конфигурация, `/health`, обработчик запуска | ✅ |
+| УП7 | ORM‑модели | ✅ |
+| УП8 | миграции Alembic | ✅ |
+| УП9 | репозитории и транзакции | ✅ |
+| УП10 | схемы Pydantic и валидация | ✅ |
+| УП11 | регистрация, хэширование пароля | ✅ |
+| УП12 | вход, JWT, `/users/me` | ✅ |
+| далее | категории, заявки, назначение, статусы, комментарии, аудит, отчёт, WebSocket | по контракту `docs/05_api_contract.md` |

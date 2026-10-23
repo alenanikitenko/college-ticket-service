@@ -1,4 +1,3 @@
-"""College Ticket Service — REST API «Сервис заявок колледжа».
+"""College Ticket Service — REST API «Сервис заявок колледжа»."""
 
-Код приложения появляется на этапе УП6 (каркас FastAPI).
-"""
+__version__ = "0.2.0"
