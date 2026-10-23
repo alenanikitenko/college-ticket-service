@@ -1,0 +1,28 @@
+digraph arch {
+  rankdir=TB; nodesep=0.5; ranksep=0.55;
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=11, fillcolor="#eef3fb", color="#4a6fa5"];
+  edge [fontname="DejaVu Sans", fontsize=9, color="#555555"];
+  client [label="Клиент\n(Swagger UI, curl, фронтенд)", shape=ellipse, fillcolor="#ffffff", style="filled,dashed"];
+  routers [label="1. routers\nHTTP / WebSocket маршруты,\nпроверка токена и роли"];
+  schemas [label="2. schemas\nPydantic: вход / выход"];
+  services [label="3. services\nбизнес-правила,\ncommit / rollback"];
+  repositories [label="4. repositories\nCRUD-запросы, без commit"];
+  models [label="5. models\nORM-таблицы, Enum"];
+  db [label="SQLite\n(college_tickets.db)", shape=cylinder, fillcolor="#fff7e0", color="#b08900"];
+  core [label="6. core\nconfig · security (hash, JWT)\ndatabase · errors", fillcolor="#e8f5e9", color="#2e7d32"];
+  tests [label="7. tests\npytest + временная SQLite", fillcolor="#fdecea", color="#c62828"];
+  client -> routers [label="HTTP JSON"];
+  routers -> services [label="вызов"];
+  routers -> schemas [label="валидация"];
+  services -> repositories [label="чтение/запись"];
+  services -> schemas [style=dashed];
+  repositories -> models [label="ORM"];
+  models -> db [label="SQL"];
+  routers -> core [label="auth", color="#2e7d32"];
+  services -> core [label="hash, JWT", color="#2e7d32"];
+  repositories -> core [label="Session", color="#2e7d32"];
+  models -> core [label="Base", color="#2e7d32"];
+  tests -> routers [style=dotted, label="TestClient"];
+  tests -> services [style=dotted];
+  {rank=same; schemas; services}
+}
